@@ -22,9 +22,8 @@ public class UserServiceProxy extends UserService {
     private static final AtomicInteger HALF_OPEN_REQUESTS_COUNT = new AtomicInteger(0);
     private static final int TIMEOUT = 5000;
     private final AtomicLong CB_OPEN_TIME = new AtomicLong(0);
-    private final AtomicReference<State> state = new AtomicReference<>(State.CLOSED);
-    private final int threshold = 2;
-    private RestTemplate restTemplate;
+    private final AtomicReference<State> STATE = new AtomicReference<>(State.CLOSED);
+    private final int THRESHOLD = 2;
 
     @Autowired
     public UserServiceProxy(RestTemplate restTemplate) {
@@ -62,7 +61,7 @@ public class UserServiceProxy extends UserService {
     }
 
     private ResponseEntity<?> handleResponse(Supplier<ResponseEntity<?>> supplier) {
-        if (state.get() == State.HALF_OPEN) return handleHalfOpen(supplier);
+        if (STATE.get() == State.HALF_OPEN) return handleHalfOpen(supplier);
         else return handleClosed(supplier);
     }
 
@@ -83,24 +82,24 @@ public class UserServiceProxy extends UserService {
         ResponseEntity<?> response = null;
         try {
             response = supplier.get();
-
+            HALF_OPEN_REQUESTS_COUNT.incrementAndGet();
         } catch (HttpClientErrorException e) {
             throw new BadRequestException(e.getResponseBodyAsString(),e.getStatusCode());
         } catch (HttpServerErrorException e) {
-            state.set(State.OPEN);
+            STATE.set(State.OPEN);
             CB_OPEN_TIME.set(System.currentTimeMillis());
             HALF_OPEN_REQUESTS_COUNT.set(0);
             throw new ServiceUnavailableException();
         }
-        if (HALF_OPEN_REQUESTS_COUNT.get() == threshold) closeCB();
+        if (HALF_OPEN_REQUESTS_COUNT.get() == THRESHOLD) closeCB();
         return response;
     }
 
     private void updateCircuitBreakerState() {
-        if (state.get() == State.CLOSED && FAILURE_REQUESTS_COUNT.get() >= threshold) {
+        if (STATE.get() == State.CLOSED && FAILURE_REQUESTS_COUNT.get() >= THRESHOLD) {
             openCB();
         }
-        if (state.get() == State.OPEN) {
+        if (STATE.get() == State.OPEN) {
             halfOpenCB();
         }
     }
@@ -108,17 +107,17 @@ public class UserServiceProxy extends UserService {
     private void halfOpenCB() {
         long now = System.currentTimeMillis();
         if (now - CB_OPEN_TIME.get() > TIMEOUT) {
-            state.set(State.HALF_OPEN);
+            STATE.set(State.HALF_OPEN);
         } else throw new ServiceUnavailableException();
     }
 
     private void openCB() {
-        state.set(State.OPEN);
+        STATE.set(State.OPEN);
         CB_OPEN_TIME.set(System.currentTimeMillis());
     }
 
     private void closeCB() {
-        state.set(State.CLOSED);
+        STATE.set(State.CLOSED);
         FAILURE_REQUESTS_COUNT.set(0);
         HALF_OPEN_REQUESTS_COUNT.set(0);
     }
