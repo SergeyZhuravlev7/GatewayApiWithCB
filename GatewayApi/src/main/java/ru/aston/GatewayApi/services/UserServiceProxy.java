@@ -18,9 +18,9 @@ import java.util.function.Supplier;
 @Service
 public class UserServiceProxy extends UserService {
 
-    private static final AtomicInteger FAILURE_REQUESTS_COUNT = new AtomicInteger(0);
-    private static final AtomicInteger HALF_OPEN_REQUESTS_COUNT = new AtomicInteger(0);
-    private static final int TIMEOUT = 5000;
+    private final AtomicInteger FAILURE_REQUESTS_COUNT = new AtomicInteger(0);
+    private final AtomicInteger HALF_OPEN_REQUESTS_COUNT = new AtomicInteger(0);
+    private final int TIMEOUT = 5000;
     private final AtomicLong CB_OPEN_TIME = new AtomicLong(0);
     private final AtomicReference<State> STATE = new AtomicReference<>(State.CLOSED);
     private final int THRESHOLD = 2;
